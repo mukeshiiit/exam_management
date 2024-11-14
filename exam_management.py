@@ -1,26 +1,138 @@
 import os
-import smtplib
+import json
 import streamlit as st
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
+import plotly.express as px
+import pandas as pd
+from datetime import datetime, timedelta
 
 # Set up page configuration and title
 st.set_page_config(page_title="IIIT Sonepat Examination Management System", layout="wide")
 st.title("IIIT Sonepat Examination Management System")
 st.write("Design and Developed by Dr. Mukesh Mann")
 
-# Set the directory where files will be saved
+# Directory setup for uploads and academic calendar
 upload_dir = "D:/Exam_management_iiit/uploads"
-if not os.path.exists(upload_dir):
-    os.makedirs(upload_dir)  # Create the directory if it doesn't exist
+calendar_dir = "D:/Exam_management_iiit/academiccalendar"
+os.makedirs(upload_dir, exist_ok=True)
+os.makedirs(calendar_dir, exist_ok=True)
 
-# Initialize session state for admin login and flags
+# Path for academic calendar JSON file
+calendar_file_path = os.path.join(calendar_dir, "academic_calendar.json")
+
+# Load academic calendar from JSON file
+def load_calendar_from_file():
+    if os.path.exists(calendar_file_path):
+        with open(calendar_file_path, "r") as file:
+            return json.load(file)
+    return []
+
+# Save academic calendar to JSON file
+def save_calendar_to_file(calendar):
+    with open(calendar_file_path, "w") as file:
+        json.dump(calendar, file, indent=4)
+
+# Initialize session state for admin login, academic calendar, and notification dismissal
 if "is_admin" not in st.session_state:
     st.session_state["is_admin"] = False
-if "action_triggered" not in st.session_state:
-    st.session_state["action_triggered"] = False  # Track upload/delete actions
+if "academic_calendar" not in st.session_state:
+    st.session_state["academic_calendar"] = load_calendar_from_file()
+if "notification_dismissed" not in st.session_state:
+    st.session_state["notification_dismissed"] = False  # Track if user has dismissed notifications
+
+# Function to display refined academic calendar with countdown and organization
+def display_academic_calendar():
+    today = datetime.now().date()
+    
+    # Split activities into categories based on date
+    upcoming_activities = []
+    ongoing_activities = []
+    past_activities = []
+    
+    for event in sorted(st.session_state["academic_calendar"], key=lambda x: x["start_date"]):
+        activity = event["activity"]
+        start_date = datetime.strptime(event["start_date"], "%Y-%m-%d").date()
+        end_date = datetime.strptime(event["end_date"], "%Y-%m-%d").date() if event["end_date"] else None
+        days_remaining = (start_date - today).days
+        
+        if end_date and end_date < today:
+            past_activities.append((activity, start_date, end_date, "Ended"))
+        elif start_date <= today <= (end_date or today):
+            ongoing_activities.append((activity, start_date, end_date, "Ongoing"))
+        else:
+            countdown_text = f"{days_remaining} days remaining" if days_remaining > 0 else "Today!"
+            upcoming_activities.append((activity, start_date, end_date, countdown_text))
+
+    # Function to format activity details with color coding
+    def format_activity(activity, start_date, end_date, countdown_text, color):
+        start_display = start_date.strftime("%d-%m-%Y")
+        end_display = end_date.strftime("%d-%m-%Y") if end_date else "N/A"
+        return f"<span style='color:{color}'>{activity}: {start_display} to {end_display} - {countdown_text}</span>"
+
+    # Display activities with refined layout
+    st.subheader("Academic Calendar Activities")
+
+    if upcoming_activities:
+        st.markdown("### Upcoming Activities")
+        for activity, start_date, end_date, countdown_text in upcoming_activities:
+            color = "blue" if "days remaining" in countdown_text else "orange"
+            st.markdown(format_activity(activity, start_date, end_date, countdown_text, color), unsafe_allow_html=True)
+
+    if ongoing_activities:
+        st.markdown("### Ongoing Activities")
+        for activity, start_date, end_date, countdown_text in ongoing_activities:
+            st.markdown(format_activity(activity, start_date, end_date, countdown_text, "green"), unsafe_allow_html=True)
+
+    if past_activities:
+        st.markdown("### Past Activities")
+        for activity, start_date, end_date, countdown_text in past_activities:
+            st.markdown(format_activity(activity, start_date, end_date, countdown_text, "red"), unsafe_allow_html=True)
+
+# Display Academic Calendar in Timeline View using Plotly
+def display_academic_calendar_timeline():
+    academic_calendar = st.session_state["academic_calendar"]
+    if not academic_calendar:
+        st.write("No academic calendar events to display.")
+        return
+    
+    # Prepare data for timeline
+    events_data = []
+    for event in academic_calendar:
+        start_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
+        end_date = datetime.strptime(event["end_date"], "%Y-%m-%d") if event["end_date"] else start_date
+        events_data.append({
+            "Event": event["activity"],
+            "Start Date": start_date,
+            "End Date": end_date
+        })
+
+    # Create DataFrame for Plotly
+    df_events = pd.DataFrame(events_data)
+
+    # Plot the timeline using Plotly
+    fig = px.timeline(df_events, x_start="Start Date", x_end="End Date", y="Event", title="Academic Calendar Timeline")
+    fig.update_yaxes(categoryorder="total ascending")  # Sort events by start date
+    fig.update_layout(xaxis_title="Date", yaxis_title="Events", margin=dict(l=0, r=0, t=50, b=0))
+    
+    # Display timeline in Streamlit
+    st.plotly_chart(fig)
+
+# Popup notification for upcoming activity if notification has not been dismissed
+def show_upcoming_activity_notification():
+    today = datetime.now().date()
+    upcoming_activities = [
+        event for event in st.session_state["academic_calendar"]
+        if 0 < (datetime.strptime(event["start_date"], "%Y-%m-%d").date() - today).days <= 10
+    ]
+
+    if upcoming_activities:
+        st.sidebar.info("**Upcoming Activities**")
+        for event in upcoming_activities:
+            days_left = (datetime.strptime(event["start_date"], "%Y-%m-%d").date() - today).days
+            st.sidebar.write(f"Activity: {event['activity']} - {days_left} days remaining")
+
+        # Button to dismiss notification
+        if st.sidebar.button("Dismiss Notifications"):
+            st.session_state["notification_dismissed"] = True
 
 # Admin login section
 if not st.session_state["is_admin"]:
@@ -31,21 +143,53 @@ if not st.session_state["is_admin"]:
         if username == "admin" and password == "admin123":
             st.session_state["is_admin"] = True
             st.sidebar.success("Logged in as Admin")
+            st.session_state["notification_dismissed"] = False  # Reset notification dismissal on login
         else:
             st.sidebar.error("Incorrect username or password")
 else:
     # Logout button for admin
     if st.sidebar.button("Logout"):
-        st.session_state["is_admin"] = False
-        st.session_state["action_triggered"] = True  # Set action flag to refresh view
+        st.session_state["is_admin"] = False  # Set to logged-out state
+        st.session_state["notification_dismissed"] = False  # Reset notification dismissal on logout
 
-# Display mode notification in sidebar
+# Calendar and Activity input for Admin to add new calendar events
 if st.session_state["is_admin"]:
-    st.sidebar.success("Admin Mode: Upload, Delete, and Email Enabled")
-else:
-    st.sidebar.info("User Mode: Download Only")
+    st.subheader("Add Academic Calendar Activity")
 
-# Define document structure and tabs
+    # Select a date
+    selected_date = st.date_input("Select a Date to Add Activity")
+
+    # Input fields for activity name and end date
+    activity_name = st.text_input("Activity Name")
+    end_date = st.date_input("End Date (optional)", value=selected_date)
+
+    # Button to add the activity
+    if st.button("Add Activity"):
+        if activity_name and selected_date:
+            new_activity = {
+                "activity": activity_name,
+                "start_date": selected_date.strftime("%Y-%m-%d"),
+                "end_date": end_date.strftime("%Y-%m-%d") if end_date else None
+            }
+            st.session_state["academic_calendar"].append(new_activity)
+            save_calendar_to_file(st.session_state["academic_calendar"])
+            st.success("Activity added successfully!")
+        else:
+            st.error("Please enter both an activity name and a start date.")
+
+# Display the academic calendar on the main page after logout
+if not st.session_state["is_admin"] and st.session_state["academic_calendar"]:
+    display_academic_calendar()
+
+# Display the academic calendar timeline view
+st.subheader("Academic Calendar Timeline")
+display_academic_calendar_timeline()
+
+# Show notification if user has not dismissed it
+if not st.session_state["notification_dismissed"]:
+    show_upcoming_activity_notification()
+
+# Define document structure and tabs for other documents
 tab = st.sidebar.selectbox("Choose an Examination Session", 
                            ["Mid Semester -1", "Mid Semester -2", "End Term Examination Theory", 
                             "End Term Practical Examination", "General Documents"])
@@ -72,37 +216,6 @@ mime_types = {
     ".txt": "text/plain",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
-
-# Email sending function
-def send_email(subject, body, recipient_email, attachment_path=None):
-    sender_email = "your_email@gmail.com"  # Replace with sender's email
-    sender_password = "your_app_password"  # Replace with email app password for security
-
-    # Create the email
-    msg = MIMEMultipart()
-    msg["From"] = sender_email
-    msg["To"] = recipient_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
-
-    # Attach file if provided
-    if attachment_path:
-        with open(attachment_path, "rb") as attachment:
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header("Content-Disposition", f"attachment; filename= {os.path.basename(attachment_path)}")
-            msg.attach(part)
-
-    try:
-        # Send email
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, recipient_email, msg.as_string())
-        st.success("Email sent successfully!")
-    except Exception as e:
-        st.error(f"Failed to send email: {e}")
 
 # Document management view
 if tab in documents:
@@ -134,7 +247,6 @@ if tab in documents:
                 # Display delete button for existing files
                 if col3.button("Delete", key=f"delete_{file_name}"):
                     os.remove(file_path)
-                    st.session_state["action_triggered"] = True  # Set action flag to refresh view
             else:
                 # Display upload option if file does not exist
                 uploaded_file = col3.file_uploader(f"Upload {doc_name}", type=['pdf', 'docx', 'txt', 'xlsx'], key=f"upload_{doc_name}")
@@ -145,32 +257,11 @@ if tab in documents:
                     file_path = os.path.join(upload_dir, standardized_name)
                     with open(file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
-                    st.session_state["action_triggered"] = True  # Set action flag to refresh view
+	
+
 
         # User Mode: Show Download button only if the file exists
         elif file_exists:
             with open(file_path, "rb") as f:
                 file_data = f.read()
             col3.download_button(label="Download", data=file_data, file_name=file_name, mime=mime_type)
-
-# Admin-only email functionality
-if st.session_state["is_admin"]:
-    st.sidebar.subheader("Send Email Notification")
-    recipient_email = st.sidebar.text_input("Recipient Email")
-    subject = st.sidebar.text_input("Subject")
-    body = st.sidebar.text_area("Message Body")
-    attachment_option = st.sidebar.selectbox("Attach Document", ["None"] + documents[tab])
-
-    # Handle file attachment selection
-    attachment_path = None
-    if attachment_option != "None":
-        available_files = [f for f in os.listdir(upload_dir) if f.startswith(attachment_option)]
-        if available_files:
-            attachment_path = os.path.join(upload_dir, available_files[0])
-
-    # Send email button
-    if st.sidebar.button("Send Email"):
-        if recipient_email and subject and body:
-            send_email(subject, body, recipient_email, attachment_path)
-        else:
-            st.sidebar.error("Please complete all fields before sending.")

@@ -12,10 +12,31 @@ git config --global user.name "mukeshiiit"
 git config --global user.email "Mukesh.maan@iiitsonepat.ac.in"
 
 
+cd D:\Exam_management_iiit
+git init
 git remote add origin https://github.com/mukeshiiit/exam_management.git
 
+git branch
+-- if you see main then you have tp oush main branch
+
+git add .
+git commit -m "Initial commit"
+git push -u origin main  # or use master if that's your branch name
 
 
+**********************************
+
+To push specif file only 
+git add Formatted_Question_Paper_Blooms_Taxonomy
+git add InstructionFile
+
+git commit -m "Add specific files only"
+
+git push -u origin main
+
+If it’s master, use: bash
+
+git push -u origin master
 
 ****************************
 

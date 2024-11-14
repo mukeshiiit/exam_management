@@ -1,0 +1,43 @@
+open git bash and install folloing 
+
+>>pip install matplotlib
+>> pip install pymupdf python-docx
+
+***************************
+
+
+Connect your Gith b with  bash
+
+git config --global user.name "mukeshiiit"
+git config --global user.email "Mukesh.maan@iiitsonepat.ac.in"
+
+
+git remote add origin https://github.com/mukeshiiit/exam_management.git
+
+
+
+
+****************************
+
+Step 2. 
+
+To know which location strelight  installd endet on  bash 
+
+>>pip3 show streamlit
+  example it shows 
+Name: streamlit
+Version: X.X.X
+Location: c/Users/<YourUsername>/AppData/Local/Programs/Python/Python<version>/Lib/site-packages
+ now change / to \ 
+ Thus path become - 
+/c/Users/Mukesh/AppData/Local/Packages/PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0/LocalCache/local-packages/Python312/site-packages 
+
+
+2. Now ad this path to system varaibe -- open envirmometkla varibae and then system variable path and add
+
+C:\Users\Mukesh\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\Scripts
+
+
+>> cd /d/bloom_analysis
+
+>> streamlit run bloom_analysis.py

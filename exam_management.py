@@ -1,5 +1,4 @@
 import os
-import base64
 import streamlit as st
 
 # Set up page configuration and title
@@ -12,9 +11,11 @@ upload_dir = "D:/Exam_management_iiit/uploads"
 if not os.path.exists(upload_dir):
     os.makedirs(upload_dir)  # Create the directory if it doesn't exist
 
-# Initialize session state for admin login
+# Initialize session state for admin login and flags
 if "is_admin" not in st.session_state:
     st.session_state["is_admin"] = False
+if "action_triggered" not in st.session_state:
+    st.session_state["action_triggered"] = False  # Track upload/delete actions
 
 # Admin login section
 if not st.session_state["is_admin"]:
@@ -31,7 +32,7 @@ else:
     # Logout button for admin
     if st.sidebar.button("Logout"):
         st.session_state["is_admin"] = False
-        st.sidebar.info("Logged out successfully")
+        st.session_state["action_triggered"] = True  # Set action flag to refresh view
 
 # Display mode notification in sidebar
 if st.session_state["is_admin"]:
@@ -97,8 +98,7 @@ if tab in documents:
                 # Display delete button for existing files
                 if col3.button("Delete", key=f"delete_{file_name}"):
                     os.remove(file_path)
-                    st.warning(f"{doc_name} has been deleted.")
-                    st.experimental_rerun()  # Refresh the app to update the view
+                    st.session_state["action_triggered"] = True  # Set action flag to refresh view
             else:
                 # Display upload option if file does not exist
                 uploaded_file = col3.file_uploader(f"Upload {doc_name}", type=['pdf', 'docx', 'txt', 'xlsx'], key=f"upload_{doc_name}")
@@ -109,11 +109,14 @@ if tab in documents:
                     file_path = os.path.join(upload_dir, standardized_name)
                     with open(file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
-                    st.success(f"{doc_name} uploaded successfully.")
-                    st.experimental_rerun()
+                    st.session_state["action_triggered"] = True  # Set action flag to refresh view
 
         # User Mode: Show Download button only if the file exists
         elif file_exists:
             with open(file_path, "rb") as f:
                 file_data = f.read()
             col3.download_button(label="Download", data=file_data, file_name=file_name, mime=mime_type)
+
+# Reset the action_triggered flag after rendering
+if st.session_state["action_triggered"]:
+    st.session_state["action_triggered"] = False  # Reset after displaying changes

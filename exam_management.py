@@ -1,5 +1,10 @@
 import os
+import smtplib
 import streamlit as st
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 
 # Set up page configuration and title
 st.set_page_config(page_title="IIIT Sonepat Examination Management System", layout="wide")
@@ -36,7 +41,7 @@ else:
 
 # Display mode notification in sidebar
 if st.session_state["is_admin"]:
-    st.sidebar.success("Admin Mode: Upload and Delete Enabled")
+    st.sidebar.success("Admin Mode: Upload, Delete, and Email Enabled")
 else:
     st.sidebar.info("User Mode: Download Only")
 
@@ -68,7 +73,38 @@ mime_types = {
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
 
-# Display documents in a table format with options based on user role
+# Email sending function
+def send_email(subject, body, recipient_email, attachment_path=None):
+    sender_email = "your_email@gmail.com"  # Replace with sender's email
+    sender_password = "your_app_password"  # Replace with email app password for security
+
+    # Create the email
+    msg = MIMEMultipart()
+    msg["From"] = sender_email
+    msg["To"] = recipient_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    # Attach file if provided
+    if attachment_path:
+        with open(attachment_path, "rb") as attachment:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", f"attachment; filename= {os.path.basename(attachment_path)}")
+            msg.attach(part)
+
+    try:
+        # Send email
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, recipient_email, msg.as_string())
+        st.success("Email sent successfully!")
+    except Exception as e:
+        st.error(f"Failed to send email: {e}")
+
+# Document management view
 if tab in documents:
     st.header(f"{tab} Documents")
 
@@ -117,6 +153,24 @@ if tab in documents:
                 file_data = f.read()
             col3.download_button(label="Download", data=file_data, file_name=file_name, mime=mime_type)
 
-# Reset the action_triggered flag after rendering
-if st.session_state["action_triggered"]:
-    st.session_state["action_triggered"] = False  # Reset after displaying changes
+# Admin-only email functionality
+if st.session_state["is_admin"]:
+    st.sidebar.subheader("Send Email Notification")
+    recipient_email = st.sidebar.text_input("Recipient Email")
+    subject = st.sidebar.text_input("Subject")
+    body = st.sidebar.text_area("Message Body")
+    attachment_option = st.sidebar.selectbox("Attach Document", ["None"] + documents[tab])
+
+    # Handle file attachment selection
+    attachment_path = None
+    if attachment_option != "None":
+        available_files = [f for f in os.listdir(upload_dir) if f.startswith(attachment_option)]
+        if available_files:
+            attachment_path = os.path.join(upload_dir, available_files[0])
+
+    # Send email button
+    if st.sidebar.button("Send Email"):
+        if recipient_email and subject and body:
+            send_email(subject, body, recipient_email, attachment_path)
+        else:
+            st.sidebar.error("Please complete all fields before sending.")

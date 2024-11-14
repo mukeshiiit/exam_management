@@ -105,7 +105,7 @@ def display_academic_calendar_timeline():
             "End Date": end_date
         })
 
-    # Create DataFrame for Plotly
+    # Create DataFrame for Plotl
     df_events = pd.DataFrame(events_data)
 
     # Plot the timeline using Plotly

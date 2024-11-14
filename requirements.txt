@@ -2,3 +2,5 @@ streamlit
 matplotlib
 pymupdf
 python-docx
+python-dotenv
+python plotly

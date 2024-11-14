@@ -1,8 +1,6 @@
 import os
 import json
 import streamlit as st
-import plotly.express as px
-import pandas as pd
 from datetime import datetime, timedelta
 
 # Set up page configuration and title
@@ -87,35 +85,6 @@ def display_academic_calendar():
         for activity, start_date, end_date, countdown_text in past_activities:
             st.markdown(format_activity(activity, start_date, end_date, countdown_text, "red"), unsafe_allow_html=True)
 
-# Display Academic Calendar in Timeline View using Plotly
-def display_academic_calendar_timeline():
-    academic_calendar = st.session_state["academic_calendar"]
-    if not academic_calendar:
-        st.write("No academic calendar events to display.")
-        return
-    
-    # Prepare data for timeline
-    events_data = []
-    for event in academic_calendar:
-        start_date = datetime.strptime(event["start_date"], "%Y-%m-%d")
-        end_date = datetime.strptime(event["end_date"], "%Y-%m-%d") if event["end_date"] else start_date
-        events_data.append({
-            "Event": event["activity"],
-            "Start Date": start_date,
-            "End Date": end_date
-        })
-
-    # Create DataFrame for Plotl
-    df_events = pd.DataFrame(events_data)
-
-    # Plot the timeline using Plotly
-    fig = px.timeline(df_events, x_start="Start Date", x_end="End Date", y="Event", title="Academic Calendar Timeline")
-    fig.update_yaxes(categoryorder="total ascending")  # Sort events by start date
-    fig.update_layout(xaxis_title="Date", yaxis_title="Events", margin=dict(l=0, r=0, t=50, b=0))
-    
-    # Display timeline in Streamlit
-    st.plotly_chart(fig)
-
 # Popup notification for upcoming activity if notification has not been dismissed
 def show_upcoming_activity_notification():
     today = datetime.now().date()
@@ -180,10 +149,6 @@ if st.session_state["is_admin"]:
 # Display the academic calendar on the main page after logout
 if not st.session_state["is_admin"] and st.session_state["academic_calendar"]:
     display_academic_calendar()
-
-# Display the academic calendar timeline view
-st.subheader("Academic Calendar Timeline")
-display_academic_calendar_timeline()
 
 # Show notification if user has not dismissed it
 if not st.session_state["notification_dismissed"]:
@@ -257,8 +222,6 @@ if tab in documents:
                     file_path = os.path.join(upload_dir, standardized_name)
                     with open(file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
-	
-
 
         # User Mode: Show Download button only if the file exists
         elif file_exists:
